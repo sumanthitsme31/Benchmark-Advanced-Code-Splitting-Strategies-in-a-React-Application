@@ -1,0 +1,353 @@
+Implement and Benchmark Advanced Code Splitting Strategies in a React Application
+Objective
+Build a multi-page React application to implement and benchmark four distinct code-splitting strategies: none, route-based, component-based, and library-based. You will learn to use React.lazy, Suspense, and Vite's manualChunks to optimize application performance. This task is crucial for developing production-grade web applications that deliver fast initial load times and efficient resource caching.
+
+Description
+1. Project Overview & Core Concepts
+Modern web applications have grown increasingly complex, often leading to large JavaScript bundles that can significantly slow down initial page loads. A slow start can frustrate users and negatively impact key business metrics. The primary technique to combat this is code splitting, a process of dividing the application's code into smaller, more manageable chunks that can be loaded on demand.
+
+In this project, you will build a React application from the ground up and systematically apply and benchmark four different code-splitting strategies. Your goal is not just to implement these techniques but to deeply understand their impact on performance, caching, and user experience. You will use industry-standard tools to measure bundle size, analyze network waterfalls, and quantify improvements in key metrics like Time to Interactive (TTI).
+
+Key Technologies and Concepts
+React (React.lazy and Suspense): React provides built-in tools for code splitting. React.lazy lets you render a dynamically imported component as a regular component. It works seamlessly with Suspense, which allows you to specify a loading indicator (a fallback UI) while the lazy component's code is being loaded over the network.
+Why it matters: This is the idiomatic way to implement route-based and component-based splitting in React. It integrates directly with the React component model, making it declarative and easy to reason about. A common pitfall is forgetting that React.lazy currently only supports default exports.
+Dynamic import(): This is the underlying JavaScript language feature that makes code splitting possible. Unlike a static import statement, which bundles the module at build time, a dynamic import() is a function-like expression that returns a Promise. The module is fetched only when the import() is called, allowing for on-demand loading.
+Why it matters: It's the engine behind React.lazy. Understanding how it works will help you debug issues and even implement custom lazy-loading logic if needed.
+Vite (manualChunks): Vite is a modern, fast build tool for web development. Its configuration allows for fine-grained control over the build output. The build.rollupOptions.output.manualChunks option lets you define rules to group specific modules into custom chunks. This is particularly useful for separating large, stable third-party libraries (vendor code) from your more frequently changing application code.
+Why it matters: This strategy dramatically improves caching. When you deploy a small change to your app, users only need to re-download the small app code chunk, not the entire vendor library, which their browser has likely cached from a previous visit.
+Performance Benchmarking (Lighthouse & Chrome DevTools): You can't optimize what you can't measure. Lighthouse is an automated tool for auditing web page quality, providing scores for performance, accessibility, and more. The Chrome DevTools Network tab provides a waterfall view of all resources loaded by a page, showing what is being loaded, when, and from where (network or cache).
+Why it matters: These tools provide the objective data needed to prove that your optimizations are working. They help you move from "I think this is faster" to "I have reduced the initial JS payload by 150KB and improved TTI by 400ms."
+
+
+2. System Architecture & Setup
+You will build a simulated SaaS application with four distinct pages, each with different dependency weights to make the effects of code splitting clearly visible.
+
+/dashboard: A lightweight landing page.
+/analytics: A data-heavy page that uses Chart.js for visualization.
+/editor: A feature-rich page with a TipTap-based rich text editor.
+/settings: Another lightweight page for user settings.
+
+The core of this project involves creating four separate build configurations to compare their outputs. You should set up your package.json with distinct scripts for each version.
+
+{
+  "scripts": {
+    "dev": "vite",
+    "build:nosplit": "vite build --config vite.config.nosplit.js",
+    "build:routes": "vite build --config vite.config.routes.js",
+    "build:components": "vite build --config vite.config.components.js",
+    "build:libsplit": "vite build --config vite.config.libsplit.js",
+    "preview": "vite preview"
+  }
+}
+
+This structure allows you to generate each version's build artifacts into a separate directory for isolated analysis. The application itself will use React Router v6 for navigation.
+
+3. Implementation Step-by-Step: Building the Four Versions
+Follow these steps to create each version of the application.
+
+Version 1: The Monolith (Baseline)
+This version serves as your performance baseline. All code is bundled into a single file.
+
+Project Setup: Initialize a new React project using Vite.
+
+Install Dependencies: Add react-router-dom, chart.js, @tiptap/react, @tiptap/starter-kit, and other necessary libraries.
+
+Create Pages: Build the four page components (Dashboard, Analytics, Editor, Settings). Ensure the Analytics page renders a Chart.js chart and the Editor page renders a TipTap instance.
+
+Set Up Routing: In your main App.jsx, use static imports for all page components and configure the routes using React Router.
+
+// App.jsx - Version 1
+import Dashboard from './pages/Dashboard';
+import Analytics from './pages/Analytics';
+import Editor from './pages/Editor';
+import Settings from './pages/Settings';
+
+// ... Router setup with <Routes> and <Route> ...
+Build: Run your build:nosplit script. Inspect the output directory (dist). You should see one large JavaScript file containing all your application code and dependencies.
+
+Version 2: Route-Based Splitting
+This is the most common and impactful form of code splitting.
+
+Refactor Imports: Modify App.jsx to use React.lazy and dynamic import() for each page component.
+
+// App.jsx - Version 2
+import { lazy, Suspense } from 'react';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+// ... etc.
+Add Suspense: Wrap your <Routes> component with a <Suspense> boundary. Provide a fallback UI, such as a simple loading spinner or a page skeleton, to show while the route's chunk is loading.
+
+<Suspense fallback={<div>Loading page...</div>}>
+  <Routes>
+    {/* ... Route definitions ... */}
+  </Routes>
+</Suspense>
+Build: Run your build:routes script. The output directory should now contain multiple smaller JavaScript chunks, one for each lazily loaded page, in addition to the main entry chunk.
+
+Version 3: Component-Based Splitting
+Here, you'll apply splitting to a heavy component within a page.
+
+Create a Heavy Component: On your Dashboard page, create a QuickReportModal component that uses Chart.js. This modal will be shown only when a user clicks a button.
+
+Implement Lazy Loading: In the Dashboard component, lazily import the QuickReportModal. Use a state variable to control its visibility.
+
+// Dashboard.jsx - Version 3
+const QuickReportModal = lazy(() => import('../components/QuickReportModal'));
+
+function Dashboard() {
+  const [showModal, setShowModal] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setShowModal(true)}>View Quick Report</button>
+      {showModal && (
+        <Suspense fallback={<div>Loading report...</div>}>
+          <QuickReportModal onClose={() => setShowModal(false)} />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+Build: Run your build:components script. You should see a new, separate chunk specifically for QuickReportModal.
+
+Version 4: Library Splitting (Manual Chunks)
+This final version optimizes for caching by separating vendor code.
+
+Configure Vite: Create a vite.config.libsplit.js file. Use the manualChunks option to define rules for splitting out large libraries.
+
+// vite.config.libsplit.js
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules/chart.js')) {
+            return 'vendor-chartjs';
+          }
+          if (id.includes('node_modules/@tiptap')) {
+            return 'vendor-tiptap';
+          }
+          if (id.includes('node_modules/react')) {
+            return 'vendor-react';
+          }
+        }
+      }
+    }
+  }
+});
+Build: Run the build:libsplit script. Inspect the build output. You will now see chunks named vendor-chartjs.js, vendor-tiptap.js, and vendor-react.js, completely separate from your application code chunks.
+
+4. Benchmarking and Analysis Protocol
+With all four versions built, you will now systematically measure and compare their performance. Document your findings for each step.
+
+Bundle Size Comparison:
+
+For each of the four build outputs, calculate the total gzipped size of all JavaScript assets.
+More importantly, determine the size of the JavaScript downloaded on an initial visit to the Dashboard (/) page. This is the critical metric for first-time user experience. Use ls -lh or a similar command to inspect file sizes.
+Time to Interactive (TTI) Measurement:
+
+Use a local server like npx serve to host each of the four dist directories on different ports.
+Use the Lighthouse CLI to programmatically measure the TTI for the Dashboard page of each version. Run the audit in a clean browser state (incognito mode) to simulate a first-time visit.
+Example command:
+lighthouse http://localhost:4001 --output=json --only-categories=performance --chrome-flags="--headless"
+Parse the JSON output to extract the interactive audit's numeric value.
+Network Waterfall Analysis:
+
+Open Chrome DevTools and go to the Network tab. Disable the cache.
+For each of the four running versions:
+Load the Dashboard page (/) and take a screenshot of the JS files loaded.
+Navigate to the Analytics page (/analytics) and take a screenshot of the additional JS files loaded.
+Navigate to the Editor page (/editor) and take a screenshot of the additional JS files loaded.
+Your screenshots should clearly illustrate the on-demand loading behavior of the different strategies.
+Cache Efficiency Simulation:
+
+This step demonstrates the power of library splitting.
+Day 1 (Initial Visit): With a clear cache, visit all four pages of the Version 4 (Lib Splitting) application. In the DevTools Network tab, note the total bytes of JavaScript downloaded.
+Day 2 (App Update): Make a trivial change to your Dashboard.jsx component (e.g., change some text). Re-run the build:libsplit script. Do not clear the browser cache. Reload the Dashboard page. Observe the Network tab. You should see that your application code chunk (e.g., Dashboard-*.js) is re-downloaded, but the vendor chunks (vendor-react.js, etc.) are served from the browser cache (indicated by a 304 Not Modified status or (disk cache) size).
+Calculate the bytes downloaded on Day 2 and compare it to Day 1. Do the same for the Version 1 (No Splitting) build to highlight the difference.
+Suspense and useTransition UX Evaluation:
+
+Focus on Version 3 (Component Splitting). In DevTools, throttle your network speed to "Slow 3G".
+
+Click the "View Quick Report" button. Observe the user experience. The fallback UI appears, but the main UI might feel unresponsive.
+
+Now, refactor your button's onClick handler to use React's useTransition hook.
+
+import { useTransition } from 'react';
+
+const [isPending, startTransition] = useTransition();
+
+function handleOpen() {
+  startTransition(() => {
+    setShowModal(true);
+  });
+}
+Use the isPending state to show a loading indicator on the button itself (e.g., disable it and show a spinner). Repeat the test on a throttled network. Document the perceived improvement in UI responsiveness. The page no longer feels stuck while the component chunk is loading.
+
+5. Final Deliverables and Reporting
+Your submission must be a comprehensive analysis of your findings.
+
+Source Code: All four versions of the application, runnable via the package.json scripts.
+Analysis Report (results/report.md): A markdown file containing:
+Results Table: A completed version of the following table with your measured data.
+Metric	No splitting	Route splitting	Component splitting	Lib splitting
+Initial JS Load (Dashboard) (KB)				
+Total JS Size (All Routes) (KB)				
+Dashboard TTI (ms)				
+Chunks on Initial Load (Count)				
+JS from Cache on App Update (%)				
+*   **Network Screenshots:** Embed the network waterfall screenshots you captured for each key navigation step.
+*   **Recommendation:** Based on your data, provide a recommended code-splitting strategy for a typical, complex SaaS dashboard application. Your recommendation should be specific. For example: "I recommend a hybrid approach. Start with route-based splitting for all pages. If any single route's chunk exceeds 200KB, analyze it for heavy, non-critical components that can be split further. Any third-party library over 50KB that is used on multiple routes and updated infrequently should be moved to a manual vendor chunk for long-term caching."
+6. FAQ
+Q: My React.lazy() import is failing with an error about a component not being a valid React component. What's wrong?
+A: This almost always happens because React.lazy requires the imported file to have a default export. If your component is a named export (e.g., export function MyComponent), it will fail. You can either change it to export default function MyComponent or use an adapter in the import statement: const MyComponent = lazy(() => import('./MyComponent').then(module => ({ default: module.MyComponent })));. The former is generally cleaner. See the React documentation for more details.
+Q: Why do I need four separate Vite config files?
+A: While you could use environment variables to control a single config, separate files provide maximum clarity and isolation for this exercise. It ensures that the build configuration for one strategy does not accidentally interfere with another, making your benchmarking results clean and reliable.
+Q: The manualChunks configuration seems complex. How do I know what to include in the string?
+A: The id passed to the manualChunks function is the absolute file path of the module being processed. The simplest way to create a vendor chunk is to check if the path includes 'node_modules/library-name'. You can use a bundle analyzer tool like vite-bundle-visualizer to see which libraries are contributing the most to your bundle size, which helps you decide what to split out. Refer to the Vite documentation for advanced patterns.
+Core Requirements
+1.
+The project must be containerized using Docker and Docker Compose for easy evaluation. A docker-compose.yml file must be present at the root of the repository.
+
+Contract Specification:
+
+File Location: docker-compose.yml in the project root.
+Services: Must define at least one service (e.g., app) to serve the production build of the application (specifically, the output of the build:libsplit script).
+Functionality: Running docker-compose up must build the Docker image and start the container, serving the application on a specified port (e.g., 80 or 8080).
+Healthcheck: The application service in docker-compose.yml must have a healthcheck configured to verify that the web server is running.
+Verification:
+
+Verify the existence of docker-compose.yml and a corresponding Dockerfile.
+Run docker-compose up -d --build.
+Verify the container starts and becomes healthy within 2 minutes.
+Send an HTTP GET request to the exposed port and expect a 200 OK response with HTML content.
+2.
+The package.json file must contain four distinct build scripts, one for each code-splitting strategy.
+
+Contract Specification:
+
+File Location: package.json
+Required Scripts: The scripts object must contain the following keys:
+build:nosplit
+build:routes
+build:components
+build:libsplit
+Verification:
+
+Parse the package.json file.
+Check for the existence of all four required script names under the scripts key.
+3.
+The build:nosplit script must generate a build with a single primary JavaScript chunk.
+
+Contract Specification:
+
+Trigger: Run npm run build:nosplit.
+Output Directory: A dist/assets directory (or similar, based on Vite config).
+Expected Chunks: The output directory should contain exactly one main JavaScript file (e.g., index-*.js). Other asset files like CSS, images, and vendor polyfills are acceptable, but the application and its dependencies must be bundled into one primary JS file.
+Verification:
+
+Execute npm install and then npm run build:nosplit.
+List the contents of the build output's assets directory.
+Verify that there is only one JavaScript file matching the pattern for a main application chunk (e.g., index-*.js or main-*.js).
+4.
+The build:routes script must generate a build where each page is in a separate JavaScript chunk.
+
+Contract Specification:
+
+Trigger: Run npm run build:routes.
+Output Directory: A dist/assets directory.
+Expected Chunks: The output directory must contain multiple JavaScript chunks. There should be chunks corresponding to at least the Analytics and Editor pages, identifiable by name.
+Verification:
+
+Execute npm install and then npm run build:routes.
+List the contents of the build output's assets directory.
+Verify the existence of at least 3 distinct JavaScript chunks (e.g., index-*.js, Analytics-*.js, Editor-*.js).
+5.
+The build:libsplit script must generate a build with separate chunks for specified vendor libraries.
+
+Contract Specification:
+
+Trigger: Run npm run build:libsplit.
+Output Directory: A dist/assets directory.
+Expected Chunks: The output must contain chunks with specific names for the vendor libraries.
+A chunk for Chart.js (e.g., vendor-chartjs-*.js)
+A chunk for TipTap (e.g., vendor-tiptap-*.js)
+A chunk for React (e.g., vendor-react-*.js)
+Verification:
+
+Execute npm install and then npm run build:libsplit.
+List the contents of the build output's assets directory.
+Verify that files matching the patterns vendor-chartjs-*.js, vendor-tiptap-*.js, and vendor-react-*.js exist.
+6.
+The application must contain navigation links and key UI elements with data-testid attributes for automated testing.
+
+Contract Specification:
+
+Navigation Links: Must be present for all pages.
+Dashboard: `data-testid=
+7.
+A detailed analysis report must be provided in a specific markdown file.
+
+Contract Specification:
+
+File Location: results/report.md
+Required Content: The file must contain a markdown table with the following headers in the first row:
+Metric
+No splitting
+Route splitting
+Component splitting
+Lib splitting
+Verification:
+
+Check for the existence of the results/report.md file.
+Parse the markdown file.
+Verify that a table exists and its first row contains the specified headers.
+8.
+Screenshots of the browser's network tab must be provided in a designated directory.
+
+Contract Specification:
+
+Directory Location: results/screenshots/
+Required Files: The directory must contain at least four .png files, demonstrating the network activity for different loading scenarios.
+Verification:
+
+Check for the existence of the results/screenshots/ directory.
+Verify that it contains at least four files with a .png extension.
+9.
+The component-based splitting for the 'Quick Report' modal must function correctly.
+
+Contract Specification:
+
+UI Elements:
+A button on the Dashboard page with data-testid="view-report-button".
+The lazily loaded modal, when rendered, must have a container element with data-testid="quick-report-modal".
+Behavior: The JavaScript chunk for the QuickReportModal must only be loaded after the 'View Report' button is clicked.
+**Verification (using Playwright/Cypress):
+
+Start the application (using the 'components' version).
+Navigate to the Dashboard page (/).
+Start monitoring network requests.
+Confirm that no chunk corresponding to QuickReportModal has been loaded.
+Click the button with data-testid="view-report-button".
+Verify that a new network request for the QuickReportModal's JavaScript chunk is initiated.
+Verify the element with data-testid="quick-report-modal" is now visible in the DOM.
+10.
+The useTransition hook must be implemented to provide visual feedback while the lazy component is loading.
+
+Contract Specification:
+
+UI Elements:
+The 'View Report' button (data-testid="view-report-button") should show a loading state.
+When the transition is pending, the button should contain an element with data-testid="button-loading-indicator".
+Behavior: When the 'View Report' button is clicked on a throttled network, the loading indicator must appear immediately, before the modal's network request completes and the modal itself is rendered.
+**Verification (using Playwright/Cypress with network throttling):
+
+Start the application.
+Enable network throttling (e.g., 'Slow 3G').
+Navigate to the Dashboard page.
+Click the button with data-testid="view-report-button".
+Immediately check that the element with data-testid="button-loading-indicator" is visible inside the button.
+Wait for the modal's chunk to load and verify the loading indicator is removed and the modal appears.
+
