@@ -351,3 +351,8 @@ Click the button with data-testid="view-report-button".
 Immediately check that the element with data-testid="button-loading-indicator" is visible inside the button.
 Wait for the modal's chunk to load and verify the loading indicator is removed and the modal appears.
 
+Submission Instructions
+Submit a single repository containing the complete source code. The repository MUST include a docker-compose.yml and a corresponding Dockerfile to serve the final, optimized build (Version 4). Your package.json must contain four distinct build scripts: build:nosplit, build:routes, build:components, and build:libsplit. Ensure a .env.example file is present documenting any environment variables. Your submission must include a results/report.md file that contains the final results table, and a results/screenshots/ directory with all network waterfall screenshots. Your final analysis and recommended splitting strategy must be detailed within the results/report.md file.
+
+Evaluation Overview
+Your submission will be evaluated based on several criteria. First, we will run automated tests to verify the functional requirements, such as the correct implementation of each of the four code-splitting versions, the presence of required UI elements, and the proper functioning of navigation. Automated code analysis will be used to assess code quality, project structure, and adherence to React best practices. Your docker-compose.yml setup will be checked for correctness and the ability to serve the final application. Finally, your analysis report, including the results table and strategic recommendations, will be reviewed for clarity, accuracy, and depth of understanding.
