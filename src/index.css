@@ -1,0 +1,74 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+nav ul {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+}
+
+nav a {
+  color: #1d4ed8;
+}
+
+.chart-wrap {
+  height: 260px;
+}
+
+.editor-wrap {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.ProseMirror {
+  min-height: 160px;
+  outline: none;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(15 23 42 / 45%);
+  display: grid;
+  place-items: center;
+}
+
+.modal-card {
+  width: min(560px, 95vw);
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+button {
+  cursor: pointer;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.4rem;
+  background: #f8fafc;
+}
+
+button:disabled {
+  cursor: progress;
+}
