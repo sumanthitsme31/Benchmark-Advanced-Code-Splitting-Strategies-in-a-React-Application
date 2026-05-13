@@ -6,7 +6,7 @@ services:
     ports:
       - '8080:80'
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80 || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:80 | grep -q '<div id=\"root\"></div>'"]
       interval: 10s
       timeout: 5s
       retries: 12
